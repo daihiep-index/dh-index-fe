@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { TrendingUp, AlertCircle } from 'lucide-react';
+import { Logo } from '../ui/Logo';
+import { AlertCircle } from 'lucide-react';
 
 export const LoginForm: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -31,13 +32,8 @@ export const LoginForm: React.FC = () => {
       <div className="w-full max-w-md">
         <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-8 shadow-2xl">
           <div className="text-center mb-8">
-            <div className="flex justify-center mb-4">
-              <div className="bg-emerald-600 p-3 rounded-full">
-                <TrendingUp className="w-8 h-8 text-white" />
-              </div>
-            </div>
-            <h1 className="text-3xl font-bold text-white mb-2">StockTrader Pro</h1>
-            <p className="text-slate-400">Sign in to your trading account</p>
+            <Logo size="xl" variant="login" className="mb-6" />
+            <p className="text-slate-400 text-lg">Sign in to your trading account</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">

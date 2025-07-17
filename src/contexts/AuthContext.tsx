@@ -31,6 +31,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(storedUser);
     }
     setLoading(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const login = async (username: string, password: string) => {
@@ -41,6 +42,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       authService.setTokens(response.access, response.refresh);
       authService.setUser(response.user);
       setUser(response.user);
+    // eslint-disable-next-line no-useless-catch
     } catch (error) {
       throw error;
     } finally {

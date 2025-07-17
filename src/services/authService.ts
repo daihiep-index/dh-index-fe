@@ -1,4 +1,4 @@
-import { AuthResponse, LoginRequest } from '../types/auth';
+import { AuthResponse, LoginRequest, User } from '../types/auth';
 
 const API_BASE_URL = 'https://index-be.daihiep.click/api';
 
@@ -55,11 +55,11 @@ export class AuthService {
     localStorage.removeItem('user');
   }
 
-  setUser(user: any): void {
+  setUser(user: User): void {
     localStorage.setItem('user', JSON.stringify(user));
   }
 
-  getUser(): any {
+  getUser(): User | null {
     const user = localStorage.getItem('user');
     return user ? JSON.parse(user) : null;
   }
