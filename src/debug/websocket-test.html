@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Debug Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #1a1a1a;
+            color: white;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .log {
+            background: #2a2a2a;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .connected {
+            background: #4CAF50;
+        }
+        .disconnected {
+            background: #f44336;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>WebSocket Debug Test</h1>
+        
+        <div id="status" class="status disconnected">
+            Status: Disconnected
+        </div>
+        
+        <div>
+            <button onclick="connect()">Connect</button>
+            <button onclick="disconnect()">Disconnect</button>
+            <button onclick="subscribeToTCB()">Subscribe to TCB</button>
+            <button onclick="clearLog()">Clear Log</button>
+        </div>
+        
+        <div id="log" class="log"></div>
+    </div>
+
+    <script>
+        let ws = null;
+        
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function updateStatus(connected) {
+            const statusDiv = document.getElementById('status');
+            if (connected) {
+                statusDiv.textContent = 'Status: Connected';
+                statusDiv.className = 'status connected';
+            } else {
+                statusDiv.textContent = 'Status: Disconnected';
+                statusDiv.className = 'status disconnected';
+            }
+        }
+        
+        function connect() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                log('Already connected');
+                return;
+            }
+            
+            log('Connecting to WebSocket...');
+            ws = new WebSocket('wss://stream2.simplize.vn/ws');
+            
+            ws.onopen = function() {
+                log('✅ WebSocket connected');
+                updateStatus(true);
+            };
+            
+            ws.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    log(`📨 Message received: ${JSON.stringify(data, null, 2)}`);
+                    
+                    // Check if it's TCB data
+                    if (data.topic === 'quotes' && data.data) {
+                        data.data.forEach(stock => {
+                            if (stock.s === 'TCB') {
+                                log(`🏦 TCB Update: Price=${stock.p}, Change=${stock.pn}, Volume=${stock.v}`);
+                            }
+                        });
+                    }
+                    
+                    if (data.topic === 'ticks' && data.data) {
+                        data.data.forEach(tick => {
+                            if (tick.s === 'TCB') {
+                                log(`📈 TCB Tick: Price=${tick.p}, Volume=${tick.v}, Side=${tick.si}`);
+                            }
+                        });
+                    }
+                } catch (error) {
+                    log(`❌ Error parsing message: ${error.message}`);
+                    log(`Raw data: ${event.data}`);
+                }
+            };
+            
+            ws.onclose = function() {
+                log('❌ WebSocket disconnected');
+                updateStatus(false);
+            };
+            
+            ws.onerror = function(error) {
+                log(`❌ WebSocket error: ${error}`);
+                updateStatus(false);
+            };
+        }
+        
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+                log('Disconnected');
+                updateStatus(false);
+            }
+        }
+        
+        function subscribeToTCB() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('❌ Not connected. Please connect first.');
+                return;
+            }
+            
+            const subscription = {
+                event: 'sub',
+                topic: 'STOCK_RETIME_LIST',
+                params: ['TCB', 'TCB@TICKS']
+            };
+            
+            ws.send(JSON.stringify(subscription));
+            log(`📤 Subscribed to TCB: ${JSON.stringify(subscription)}`);
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        // Auto connect on page load
+        window.onload = function() {
+            log('Page loaded. Click Connect to start.');
+        };
+    </script>
+</body>
+</html>

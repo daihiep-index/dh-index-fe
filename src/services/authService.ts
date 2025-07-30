@@ -1,6 +1,6 @@
 import { AuthResponse, LoginRequest, User } from '../types/auth';
 
-const API_BASE_URL = 'https://index-be.daihiep.click/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export class AuthService {
   private static instance: AuthService;

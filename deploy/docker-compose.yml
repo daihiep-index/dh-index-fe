@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  dh-index-frontend:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    ports:
+      - "5173:5173"
+    environment:
+      - NODE_ENV=production
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-https://index-be.daihiep.click/api}
+    restart: unless-stopped
+    volumes:
+      # Mount .env file để có thể thay đổi cấu hình mà không cần rebuild
+      - ../.env:/app/.env:ro
