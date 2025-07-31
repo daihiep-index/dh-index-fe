@@ -75,10 +75,27 @@ pipeline {
                 }
             }
         }
-        
+
+        stage('Debug Info') {
+            steps {
+                echo 'Debug Information...'
+                script {
+                    sh """
+                        echo "Current branch: ${env.BRANCH_NAME}"
+                        echo "Git branch: \$(git branch --show-current)"
+                        echo "Build number: ${BUILD_NUMBER}"
+                        echo "Workspace: ${WORKSPACE}"
+                    """
+                }
+            }
+        }
+
         stage('Deploy') {
             when {
-                branch 'main' // Chỉ deploy khi push vào main branch
+                anyOf {
+                    branch 'main'
+                    branch 'first-index/job-fe'
+                }
             }
             steps {
                 echo 'Deploying to production...'
@@ -166,7 +183,10 @@ pipeline {
 
         stage('Post-Deploy Verification') {
             when {
-                branch 'main'
+                anyOf {
+                    branch 'main'
+                    branch 'first-index/job-fe'
+                }
             }
             steps {
                 echo 'Verifying deployment...'
