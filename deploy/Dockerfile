@@ -1,5 +1,5 @@
-# Sử dụng Node.js 18 official image
-FROM node:18-alpine
+# Sử dụng Node.js 20 official image (yêu cầu của React Router 7.6.3)
+FROM node:20-alpine
 
 # Thiết lập biến môi trường
 ENV NODE_ENV=production
@@ -14,7 +14,7 @@ RUN apk update && apk upgrade && apk add --no-cache git
 COPY package*.json ./
 
 # Cài đặt dependencies (bao gồm devDependencies để build)
-RUN npm ci
+RUN npm ci --include=dev
 
 # Copy source code
 COPY . .
