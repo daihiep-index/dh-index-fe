@@ -28,13 +28,11 @@ pipeline {
         stage('Setup Environment') {
             steps {
                 echo 'Setting up environment...'
-                dir('dh-index-fe') {
-                    script {
-                        // Tạo .env file
-                        sh """
-                            echo "VITE_API_BASE_URL=${VITE_API_BASE_URL}" > .env
-                        """
-                    }
+                script {
+                    // Tạo .env file
+                    sh """
+                        echo "VITE_API_BASE_URL=${VITE_API_BASE_URL}" > .env
+                    """
                 }
             }
         }
@@ -42,15 +40,13 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 echo 'Building Docker image...'
-                dir('dh-index-fe') {
-                    script {
-                        // Build Docker image
-                        sh """
-                            cd deploy
-                            docker build -f Dockerfile -t ${DOCKER_IMAGE}:${DOCKER_TAG} ..
-                            docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:${DOCKER_LATEST}
-                        """
-                    }
+                script {
+                    // Build Docker image
+                    sh """
+                        cd deploy
+                        docker build -f Dockerfile -t ${DOCKER_IMAGE}:${DOCKER_TAG} ..
+                        docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:${DOCKER_LATEST}
+                    """
                 }
             }
         }
@@ -58,23 +54,21 @@ pipeline {
         stage('Test') {
             steps {
                 echo 'Running tests...'
-                dir('dh-index-fe') {
-                    script {
-                        // Chạy container tạm để test
-                        sh """
-                            docker run --rm -d --name test-frontend-${BUILD_NUMBER} \
-                                -p 5174:5173 ${DOCKER_IMAGE}:${DOCKER_TAG}
-                            
-                            # Đợi container khởi động
-                            sleep 15
-                            
-                            # Test health check
-                            curl -f http://localhost:5174/ || exit 1
-                            
-                            # Dọn dẹp
-                            docker stop test-frontend-${BUILD_NUMBER}
-                        """
-                    }
+                script {
+                    // Chạy container tạm để test
+                    sh """
+                        docker run --rm -d --name test-frontend-${BUILD_NUMBER} \
+                            -p 5174:5173 ${DOCKER_IMAGE}:${DOCKER_TAG}
+
+                        # Đợi container khởi động
+                        sleep 20
+
+                        # Test health check
+                        curl -f http://localhost:5174/ || exit 1
+
+                        # Dọn dẹp
+                        docker stop test-frontend-${BUILD_NUMBER}
+                    """
                 }
             }
         }
@@ -89,23 +83,23 @@ pipeline {
                     sh """
                         # Tạo thư mục deploy nếu chưa có
                         sudo mkdir -p ${DEPLOY_DIR}
-                        
+
                         # Copy files
-                        sudo cp dh-index-fe/deploy/docker-compose.yml ${DEPLOY_DIR}/
-                        sudo cp dh-index-fe/.env ${DEPLOY_DIR}/
-                        
+                        sudo cp deploy/docker-compose.prod.yml ${DEPLOY_DIR}/docker-compose.yml
+                        sudo cp .env ${DEPLOY_DIR}/
+
                         # Stop old container
                         cd ${DEPLOY_DIR}
                         sudo docker-compose down || true
-                        
+
                         # Remove old image
                         sudo docker rmi ${DOCKER_IMAGE}:${DOCKER_LATEST} || true
-                        
+
                         # Start new container
                         sudo docker-compose up -d
-                        
+
                         # Health check
-                        sleep 20
+                        sleep 25
                         curl -f http://localhost:5173/ || exit 1
                     """
                 }
