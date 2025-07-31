@@ -81,22 +81,25 @@ pipeline {
                 echo 'Debug Information...'
                 script {
                     sh """
-                        echo "Current branch: ${env.BRANCH_NAME}"
-                        echo "Git branch: \$(git branch --show-current)"
+                        echo "=== BRANCH DEBUG INFO ==="
+                        echo "BRANCH_NAME env var: '${env.BRANCH_NAME}'"
+                        echo "GIT_BRANCH env var: '${env.GIT_BRANCH}'"
+                        echo "Git branch (show-current): '\$(git branch --show-current)'"
+                        echo "Git branch (all): \$(git branch -a)"
+                        echo "Git remote: \$(git remote -v)"
                         echo "Build number: ${BUILD_NUMBER}"
                         echo "Workspace: ${WORKSPACE}"
+                        echo "========================="
                     """
                 }
             }
         }
 
         stage('Deploy') {
-            when {
-                anyOf {
-                    branch 'main'
-                    branch 'first-index/job-fe'
-                }
-            }
+            // Temporarily removing 'when' condition for debugging
+            // when {
+            //     branch 'main'
+            // }
             steps {
                 echo 'Deploying to production...'
                 script {
@@ -182,12 +185,10 @@ pipeline {
         }
 
         stage('Post-Deploy Verification') {
-            when {
-                anyOf {
-                    branch 'main'
-                    branch 'first-index/job-fe'
-                }
-            }
+            // Temporarily removing 'when' condition for debugging
+            // when {
+            //     branch 'main'
+            // }
             steps {
                 echo 'Verifying deployment...'
                 script {
