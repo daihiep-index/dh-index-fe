@@ -13,16 +13,13 @@ RUN apk update && apk upgrade && apk add --no-cache git
 # Copy package files
 COPY package*.json ./
 
-# Cài đặt dependencies
-RUN npm ci --only=production
+# Cài đặt dependencies (bao gồm devDependencies để build)
+RUN npm ci
 
 # Copy source code
 COPY . .
 
-# Copy environment file
-COPY .env .env
-
-# Build application
+# Build application (sẽ sử dụng .env từ build context)
 RUN npm run build
 
 # Expose port 5173

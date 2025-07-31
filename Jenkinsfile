@@ -57,14 +57,17 @@ pipeline {
                 script {
                     // Chạy container tạm để test
                     sh """
+                        # Tìm port trống để test
+                        TEST_PORT=\$(python3 -c "import socket; s=socket.socket(); s.bind(('', 0)); print(s.getsockname()[1]); s.close()")
+
                         docker run --rm -d --name test-frontend-${BUILD_NUMBER} \
-                            -p 5174:5173 ${DOCKER_IMAGE}:${DOCKER_TAG}
+                            -p \${TEST_PORT}:5173 ${DOCKER_IMAGE}:${DOCKER_TAG}
 
                         # Đợi container khởi động
-                        sleep 20
+                        sleep 30
 
                         # Test health check
-                        curl -f http://localhost:5174/ || exit 1
+                        curl -f http://localhost:\${TEST_PORT}/ || exit 1
 
                         # Dọn dẹp
                         docker stop test-frontend-${BUILD_NUMBER}
@@ -92,15 +95,26 @@ pipeline {
                         cd ${DEPLOY_DIR}
                         sudo docker-compose down || true
 
-                        # Remove old image
+                        # Remove old image (chỉ khi có image mới)
                         sudo docker rmi ${DOCKER_IMAGE}:${DOCKER_LATEST} || true
 
                         # Start new container
                         sudo docker-compose up -d
 
-                        # Health check
-                        sleep 25
-                        curl -f http://localhost:5173/ || exit 1
+                        # Health check với retry
+                        for i in {1..10}; do
+                            sleep 5
+                            if curl -f http://localhost:5173/ > /dev/null 2>&1; then
+                                echo "Health check passed!"
+                                break
+                            fi
+                            if [ \$i -eq 10 ]; then
+                                echo "Health check failed after 10 attempts"
+                                sudo docker-compose logs
+                                exit 1
+                            fi
+                            echo "Health check attempt \$i failed, retrying..."
+                        done
                     """
                 }
             }
@@ -112,7 +126,13 @@ pipeline {
                 script {
                     sh """
                         # Xóa images cũ (giữ lại 3 bản gần nhất)
-                        docker images ${DOCKER_IMAGE} --format "table {{.Tag}}" | grep -v TAG | grep -v latest | sort -nr | tail -n +4 | xargs -r docker rmi ${DOCKER_IMAGE}: || true
+                        OLD_IMAGES=\$(docker images ${DOCKER_IMAGE} --format "{{.Tag}}" | grep -v latest | grep '^[0-9]' | sort -nr | tail -n +4)
+                        if [ ! -z "\$OLD_IMAGES" ]; then
+                            echo "Removing old images: \$OLD_IMAGES"
+                            echo "\$OLD_IMAGES" | xargs -I {} docker rmi ${DOCKER_IMAGE}:{} || true
+                        else
+                            echo "No old images to remove"
+                        fi
                     """
                 }
             }
