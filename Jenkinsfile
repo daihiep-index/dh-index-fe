@@ -10,8 +10,8 @@ pipeline {
         // Docker registry (nếu sử dụng private registry)
         // DOCKER_REGISTRY = "your-registry.com"
         
-        // Deployment directory
-        DEPLOY_DIR = "/opt/dh-index-frontend"
+        // Deployment directory (sử dụng home directory của user)
+        DEPLOY_DIR = "\$HOME/dh-index-frontend"
         
         // Environment variables
         VITE_API_BASE_URL = "https://index-be.daihiep.click/api"
@@ -104,16 +104,16 @@ pipeline {
                 echo 'Deploying to production...'
                 script {
                     sh """
-                        # Tạo thư mục deploy nếu chưa có
-                        sudo mkdir -p ${DEPLOY_DIR}
-                        sudo chown \$(whoami):\$(whoami) ${DEPLOY_DIR}
+                        # Tạo thư mục deploy nếu chưa có (sử dụng thư mục mà user có quyền)
+                        DEPLOY_DIR_USER="\$HOME/dh-index-frontend"
+                        mkdir -p \$DEPLOY_DIR_USER
 
                         # Copy files
-                        cp deploy/docker-compose.prod.yml ${DEPLOY_DIR}/docker-compose.yml
-                        cp .env ${DEPLOY_DIR}/
+                        cp deploy/docker-compose.prod.yml \$DEPLOY_DIR_USER/docker-compose.yml
+                        cp .env \$DEPLOY_DIR_USER/
 
                         # Stop và remove old container
-                        cd ${DEPLOY_DIR}
+                        cd \$DEPLOY_DIR_USER
                         docker-compose down --remove-orphans || true
 
                         # Remove old containers và networks
@@ -193,7 +193,7 @@ pipeline {
                 echo 'Verifying deployment...'
                 script {
                     sh """
-                        cd ${DEPLOY_DIR}
+                        cd \$HOME/dh-index-frontend
 
                         # Comprehensive health check
                         echo "🔍 Running comprehensive health check..."
