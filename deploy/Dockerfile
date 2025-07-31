@@ -8,7 +8,7 @@ ENV NODE_ENV=production
 WORKDIR /app
 
 # Cập nhật hệ thống và cài đặt dependencies cần thiết
-RUN apk update && apk upgrade && apk add --no-cache git
+RUN apk update && apk upgrade && apk add --no-cache git wget curl
 
 # Copy package files
 COPY package*.json ./

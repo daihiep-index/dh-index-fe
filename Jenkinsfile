@@ -86,40 +86,146 @@ pipeline {
                     sh """
                         # Tạo thư mục deploy nếu chưa có
                         sudo mkdir -p ${DEPLOY_DIR}
+                        sudo chown \$(whoami):\$(whoami) ${DEPLOY_DIR}
 
                         # Copy files
-                        sudo cp deploy/docker-compose.prod.yml ${DEPLOY_DIR}/docker-compose.yml
-                        sudo cp .env ${DEPLOY_DIR}/
+                        cp deploy/docker-compose.prod.yml ${DEPLOY_DIR}/docker-compose.yml
+                        cp .env ${DEPLOY_DIR}/
 
-                        # Stop old container
+                        # Stop và remove old container
                         cd ${DEPLOY_DIR}
-                        sudo docker-compose down || true
+                        docker-compose down --remove-orphans || true
 
-                        # Remove old image (chỉ khi có image mới)
-                        sudo docker rmi ${DOCKER_IMAGE}:${DOCKER_LATEST} || true
+                        # Remove old containers và networks
+                        docker container prune -f || true
+                        docker network prune -f || true
 
-                        # Start new container
-                        sudo docker-compose up -d
+                        # Pull latest image (nếu có registry)
+                        # docker pull ${DOCKER_IMAGE}:${DOCKER_LATEST} || true
 
-                        # Health check với retry
-                        for i in {1..10}; do
-                            sleep 5
-                            if curl -f http://localhost:5173/ > /dev/null 2>&1; then
-                                echo "Health check passed!"
-                                break
+                        # Start new container với force recreate
+                        docker-compose up -d --force-recreate --remove-orphans
+
+                        # Đợi container khởi động
+                        echo "Waiting for container to start..."
+                        sleep 10
+
+                        # Kiểm tra container status
+                        CONTAINER_STATUS=\$(docker-compose ps -q | xargs docker inspect -f '{{.State.Status}}' 2>/dev/null || echo "not_found")
+                        echo "Container status: \$CONTAINER_STATUS"
+
+                        if [ "\$CONTAINER_STATUS" != "running" ]; then
+                            echo "❌ Container is not running!"
+                            docker-compose logs
+                            exit 1
+                        fi
+
+                        # Health check với retry và detailed logging
+                        echo "Starting health check..."
+                        for i in {1..15}; do
+                            echo "Health check attempt \$i/15..."
+
+                            # Kiểm tra port có open không
+                            if netstat -tuln | grep -q ":5173 "; then
+                                echo "✅ Port 5173 is open"
+
+                                # Kiểm tra HTTP response
+                                if curl -f -s -o /dev/null http://localhost:5173/; then
+                                    echo "✅ HTTP health check passed!"
+                                    echo "🎉 Deployment successful! Application is running at http://localhost:5173"
+                                    break
+                                else
+                                    echo "⚠️  Port is open but HTTP check failed"
+                                fi
+                            else
+                                echo "⚠️  Port 5173 is not yet available"
                             fi
-                            if [ \$i -eq 10 ]; then
-                                echo "Health check failed after 10 attempts"
-                                sudo docker-compose logs
+
+                            if [ \$i -eq 15 ]; then
+                                echo "❌ Health check failed after 15 attempts"
+                                echo "Container logs:"
+                                docker-compose logs --tail=50
+                                echo "Container status:"
+                                docker-compose ps
+                                echo "Port status:"
+                                netstat -tuln | grep 5173 || echo "Port 5173 not found"
                                 exit 1
                             fi
-                            echo "Health check attempt \$i failed, retrying..."
+
+                            sleep 5
                         done
+
+                        # Final verification
+                        echo "🔍 Final verification..."
+                        docker-compose ps
+                        echo "✅ Deployment completed successfully!"
                     """
                 }
             }
         }
-        
+
+        stage('Post-Deploy Verification') {
+            when {
+                branch 'main'
+            }
+            steps {
+                echo 'Verifying deployment...'
+                script {
+                    sh """
+                        cd ${DEPLOY_DIR}
+
+                        # Comprehensive health check
+                        echo "🔍 Running comprehensive health check..."
+
+                        # 1. Container health check
+                        CONTAINER_ID=\$(docker-compose ps -q dh-index-frontend)
+                        if [ -z "\$CONTAINER_ID" ]; then
+                            echo "❌ No container found!"
+                            exit 1
+                        fi
+
+                        HEALTH_STATUS=\$(docker inspect \$CONTAINER_ID --format='{{.State.Health.Status}}' 2>/dev/null || echo "no-healthcheck")
+                        echo "Container health status: \$HEALTH_STATUS"
+
+                        # 2. Service availability check
+                        echo "Testing service availability..."
+                        for i in {1..5}; do
+                            HTTP_CODE=\$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5173/ || echo "000")
+                            echo "HTTP response code: \$HTTP_CODE"
+
+                            if [ "\$HTTP_CODE" = "200" ]; then
+                                echo "✅ Service is responding correctly"
+                                break
+                            fi
+
+                            if [ \$i -eq 5 ]; then
+                                echo "❌ Service is not responding after 5 attempts"
+                                exit 1
+                            fi
+
+                            sleep 3
+                        done
+
+                        # 3. Resource usage check
+                        echo "Checking resource usage..."
+                        docker stats --no-stream \$CONTAINER_ID
+
+                        # 4. Log check for errors
+                        echo "Checking logs for errors..."
+                        ERROR_COUNT=\$(docker-compose logs --tail=100 | grep -i "error\\|exception\\|failed" | wc -l)
+                        if [ \$ERROR_COUNT -gt 0 ]; then
+                            echo "⚠️  Found \$ERROR_COUNT error(s) in logs:"
+                            docker-compose logs --tail=100 | grep -i "error\\|exception\\|failed"
+                        else
+                            echo "✅ No errors found in recent logs"
+                        fi
+
+                        echo "🎉 Post-deploy verification completed successfully!"
+                    """
+                }
+            }
+        }
+
         stage('Cleanup') {
             steps {
                 echo 'Cleaning up old Docker images...'
